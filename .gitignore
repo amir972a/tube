@@ -1,0 +1,36 @@
+# Dependencies
+/vendor/
+/node_modules/
+
+# Environments
+/.env
+/.env.local
+/config/config.local.php
+/config/config.php
+
+# IDEs and Editors
+/.idea/
+/.vscode/
+*.swp
+*.swo
+
+# OS Generated
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Storage and Uploads
+/storage/logs/*
+!/storage/logs/.gitkeep
+/storage/cache/*
+!/storage/cache/.gitkeep
+/uploads/*/*
+!/uploads/*/.gitkeep
+
+# Testing
+/playwright-report/
+/test-results/
