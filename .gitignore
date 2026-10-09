@@ -1,36 +1,22 @@
-# Dependencies
-/vendor/
-/node_modules/
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
 
-# Environments
-/.env
-/.env.local
-/config/config.local.php
-/config/config.php
+# SQLite database
+soc_analyzer.db
+test.db
 
-# IDEs and Editors
-/.idea/
-/.vscode/
-*.swp
-*.swo
+# Config
+threat_intel_config.json
 
-# OS Generated
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# Test logs / reports
+*.json
+*.html
+*.txt
+report_*.html
+report_*.txt
+report_*.json
 
-# Storage and Uploads
-/storage/logs/*
-!/storage/logs/.gitkeep
-/storage/cache/*
-!/storage/cache/.gitkeep
-/uploads/*/*
-!/uploads/*/.gitkeep
-
-# Testing
-/playwright-report/
-/test-results/
+# Quarantine
+soc_email_analyzer/quarantine/
