@@ -84,6 +84,7 @@ class EmailAnalyzerGUI(tk.Tk):
         # Tabs
         self._build_overview_tab()
         self._build_headers_tab()
+        self._build_spf_tab()
         self._build_findings_tab()
         self._build_urls_tab()
         self._build_attachments_tab()
@@ -125,6 +126,85 @@ class EmailAnalyzerGUI(tk.Tk):
 
         self.txt_headers = tk.Text(self.tab_headers, bg=ModernTheme.TEXT_BG, fg=ModernTheme.FG, font=('Consolas', 10))
         self.txt_headers.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+    def _build_spf_tab(self):
+        self.tab_spf = ttk.Frame(self.notebook)
+        self.notebook.add(self.tab_spf, text="SPF & DMARC / بررسی اصالت")
+
+        # Split into top (summary) and bottom (trace)
+        top_frame = ttk.Frame(self.tab_spf)
+        top_frame.pack(fill=tk.X, padx=10, pady=10)
+
+        # Summary left
+        summary_frame = ttk.LabelFrame(top_frame, text="Identities & DMARC")
+        summary_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+
+        self.lbl_spf_from = ttk.Label(summary_frame, text="Visible From: ")
+        self.lbl_spf_from.pack(anchor=tk.W, padx=5, pady=2)
+
+        self.lbl_spf_env = ttk.Label(summary_frame, text="Env Sender: ")
+        self.lbl_spf_env.pack(anchor=tk.W, padx=5, pady=2)
+
+        self.lbl_spf_ip = ttk.Label(summary_frame, text="Client IP: ")
+        self.lbl_spf_ip.pack(anchor=tk.W, padx=5, pady=2)
+
+        self.lbl_spf_ip_src = ttk.Label(summary_frame, text="IP Source: ")
+        self.lbl_spf_ip_src.pack(anchor=tk.W, padx=5, pady=2)
+
+        # Manual IP override
+        manual_frame = ttk.Frame(summary_frame)
+        manual_frame.pack(fill=tk.X, padx=5, pady=2)
+        ttk.Label(manual_frame, text="Manual IP Override:").pack(side=tk.LEFT)
+        self.entry_manual_ip = ttk.Entry(manual_frame, width=15)
+        self.entry_manual_ip.pack(side=tk.LEFT, padx=5)
+        ttk.Button(manual_frame, text="Re-evaluate", command=self._reevaluate_spf).pack(side=tk.LEFT)
+
+        ttk.Separator(summary_frame, orient='horizontal').pack(fill=tk.X, pady=5)
+
+        self.lbl_dmarc_res = ttk.Label(summary_frame, text="DMARC Result: ")
+        self.lbl_dmarc_res.pack(anchor=tk.W, padx=5, pady=2)
+
+        self.lbl_dmarc_align = ttk.Label(summary_frame, text="SPF Alignment: ")
+        self.lbl_dmarc_align.pack(anchor=tk.W, padx=5, pady=2)
+
+        self.lbl_dkim_align = ttk.Label(summary_frame, text="DKIM Alignment: ")
+        self.lbl_dkim_align.pack(anchor=tk.W, padx=5, pady=2)
+
+        # Summary right
+        eval_frame = ttk.LabelFrame(top_frame, text="Evaluations")
+        eval_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
+
+        self.lbl_eval_orig = ttk.Label(eval_frame, text="Original SPF (Env Sender): ")
+        self.lbl_eval_orig.pack(anchor=tk.W, padx=5, pady=2)
+
+        self.lbl_eval_orig_exp = ttk.Label(eval_frame, text="", foreground=ModernTheme.WARN)
+        self.lbl_eval_orig_exp.pack(anchor=tk.W, padx=5, pady=2)
+
+        ttk.Separator(eval_frame, orient='horizontal').pack(fill=tk.X, pady=5)
+
+        self.lbl_eval_from = ttk.Label(eval_frame, text="From Domain SPF: ")
+        self.lbl_eval_from.pack(anchor=tk.W, padx=5, pady=2)
+
+        self.lbl_eval_from_exp = ttk.Label(eval_frame, text="", foreground=ModernTheme.WARN)
+        self.lbl_eval_from_exp.pack(anchor=tk.W, padx=5, pady=2)
+
+        # Trace
+        trace_frame = ttk.LabelFrame(self.tab_spf, text="Authorization Trace (From Domain Policy)")
+        trace_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        columns = ("Domain", "Mechanism", "Result", "Reason")
+        self.tree_spf_trace = ttk.Treeview(trace_frame, columns=columns, show="headings")
+        self.tree_spf_trace.heading("Domain", text="Domain")
+        self.tree_spf_trace.heading("Mechanism", text="Mechanism")
+        self.tree_spf_trace.heading("Result", text="Result")
+        self.tree_spf_trace.heading("Reason", text="Reason")
+
+        self.tree_spf_trace.column("Domain", width=150)
+        self.tree_spf_trace.column("Mechanism", width=100)
+        self.tree_spf_trace.column("Result", width=80)
+        self.tree_spf_trace.column("Reason", width=400)
+
+        self.tree_spf_trace.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
     def _build_findings_tab(self):
         self.tab_findings = ttk.Frame(self.notebook)
@@ -248,6 +328,34 @@ class EmailAnalyzerGUI(tk.Tk):
         # Headers
         self.txt_headers.insert(tk.END, json.dumps(results['headers'], indent=4))
 
+        # SPF Investigation
+        spf = results.get('spf_investigation', {})
+        self.lbl_spf_from.config(text=f"Visible From: {spf.get('visible_from_domain', 'N/A')}")
+        self.lbl_spf_env.config(text=f"Env Sender: {spf.get('envelope_sender_domain', 'N/A')}")
+        self.lbl_spf_ip.config(text=f"Client IP: {spf.get('client_ip', 'N/A')}")
+        self.lbl_spf_ip_src.config(text=f"IP Source: {spf.get('client_ip_source', 'N/A')}")
+
+        dmarc = spf.get('dmarc', {})
+        self.lbl_dmarc_res.config(text=f"DMARC Result: {dmarc.get('overall_result', 'N/A')} (Policy: {dmarc.get('policy', 'N/A')})")
+        self.lbl_dmarc_align.config(text=f"SPF Alignment: {dmarc.get('spf_alignment', 'N/A')}")
+        self.lbl_dkim_align.config(text=f"DKIM Alignment: {dmarc.get('dkim_alignment', 'N/A')}")
+
+        inv = spf.get('investigations', {})
+        orig_auth = inv.get('original_auth', {})
+        self.lbl_eval_orig.config(text=f"Original SPF ({orig_auth.get('evaluated_domain', 'N/A')}): {orig_auth.get('result', 'N/A')}")
+        self.lbl_eval_orig_exp.config(text=orig_auth.get('explanation', ''))
+
+        from_auth = inv.get('visible_from_auth', {})
+        self.lbl_eval_from.config(text=f"From Domain SPF ({from_auth.get('evaluated_domain', 'N/A')}): {from_auth.get('result', 'N/A')}")
+        self.lbl_eval_from_exp.config(text=from_auth.get('explanation', ''))
+
+        for item in self.tree_spf_trace.get_children(): self.tree_spf_trace.delete(item)
+        for trace_item in from_auth.get('trace', []):
+            self.tree_spf_trace.insert("", tk.END, values=(
+                trace_item.get('domain'), trace_item.get('mechanism'),
+                trace_item.get('result'), trace_item.get('reason')
+            ))
+
         # Findings
         for finding in results['findings']:
             self.tree_findings.insert("", tk.END, values=(
@@ -277,6 +385,19 @@ class EmailAnalyzerGUI(tk.Tk):
         self.lbl_sender.config(text="Sender: ")
 
         self.txt_headers.delete(1.0, tk.END)
+
+        self.lbl_spf_from.config(text="Visible From: ")
+        self.lbl_spf_env.config(text="Env Sender: ")
+        self.lbl_spf_ip.config(text="Client IP: ")
+        self.lbl_spf_ip_src.config(text="IP Source: ")
+        self.lbl_dmarc_res.config(text="DMARC Result: ")
+        self.lbl_dmarc_align.config(text="SPF Alignment: ")
+        self.lbl_dkim_align.config(text="DKIM Alignment: ")
+        self.lbl_eval_orig.config(text="Original SPF: ")
+        self.lbl_eval_orig_exp.config(text="")
+        self.lbl_eval_from.config(text="From Domain SPF: ")
+        self.lbl_eval_from_exp.config(text="")
+        for item in self.tree_spf_trace.get_children(): self.tree_spf_trace.delete(item)
 
         for item in self.tree_findings.get_children(): self.tree_findings.delete(item)
         for item in self.tree_urls.get_children(): self.tree_urls.delete(item)
@@ -396,6 +517,71 @@ class EmailAnalyzerGUI(tk.Tk):
             if messagebox.askyesno("Confirm Lookup", f"Submit hash {h[:8]}... to VirusTotal?"):
                 self.status_label.config(text="Querying VT...")
                 threading.Thread(target=self._vt_lookup_thread, args=(h,), daemon=True).start()
+
+    def _reevaluate_spf(self):
+        if not self.current_analysis:
+            return
+
+        manual_ip = self.entry_manual_ip.get().strip()
+        if not manual_ip:
+            messagebox.showwarning("Input Required", "Please enter an IP address.")
+            return
+
+        # Re-run SPF investigation with the manual IP in a thread
+        self.status_label.config(text="Re-evaluating SPF...")
+        threading.Thread(target=self._reevaluate_spf_thread, args=(manual_ip,), daemon=True).start()
+
+    def _reevaluate_spf_thread(self, manual_ip):
+        try:
+            # We reconstruct the parts needed by the investigator
+            msg = None # Ideally we'd keep the parsed email object around, but we can mock enough for investigate
+            # Or better, we can modify the investigator to accept an explicit IP override
+            # Since the investigator takes a `msg` primarily to extract the IP, we can temporarily modify the headers
+            # or pass the override IP.
+            from email.message import EmailMessage
+            fake_msg = EmailMessage()
+            fake_msg.add_header('Received', f'from manual ({manual_ip})')
+
+            new_spf_report = self.parser.spf_investigator.investigate(
+                fake_msg,
+                self.current_analysis['headers'],
+                self.current_analysis['auth']
+            )
+
+            # Label as manual
+            new_spf_report['client_ip_source'] = "Manual Override (What-If)"
+
+            self.after(0, self._update_spf_ui, new_spf_report)
+        except Exception as e:
+            self.after(0, self._show_error, f"SPF Re-evaluation failed: {str(e)}")
+
+    def _update_spf_ui(self, spf):
+        self.status_label.config(text="Ready / آماده")
+        self.lbl_spf_from.config(text=f"Visible From: {spf.get('visible_from_domain', 'N/A')}")
+        self.lbl_spf_env.config(text=f"Env Sender: {spf.get('envelope_sender_domain', 'N/A')}")
+        self.lbl_spf_ip.config(text=f"Client IP: {spf.get('client_ip', 'N/A')}")
+        self.lbl_spf_ip_src.config(text=f"IP Source: {spf.get('client_ip_source', 'N/A')}")
+
+        dmarc = spf.get('dmarc', {})
+        self.lbl_dmarc_res.config(text=f"DMARC Result: {dmarc.get('overall_result', 'N/A')} (Policy: {dmarc.get('policy', 'N/A')})")
+        self.lbl_dmarc_align.config(text=f"SPF Alignment: {dmarc.get('spf_alignment', 'N/A')}")
+        self.lbl_dkim_align.config(text=f"DKIM Alignment: {dmarc.get('dkim_alignment', 'N/A')}")
+
+        inv = spf.get('investigations', {})
+        orig_auth = inv.get('original_auth', {})
+        self.lbl_eval_orig.config(text=f"Original SPF ({orig_auth.get('evaluated_domain', 'N/A')}): {orig_auth.get('result', 'N/A')}")
+        self.lbl_eval_orig_exp.config(text=orig_auth.get('explanation', ''))
+
+        from_auth = inv.get('visible_from_auth', {})
+        self.lbl_eval_from.config(text=f"From Domain SPF ({from_auth.get('evaluated_domain', 'N/A')}): {from_auth.get('result', 'N/A')}")
+        self.lbl_eval_from_exp.config(text=from_auth.get('explanation', ''))
+
+        for item in self.tree_spf_trace.get_children(): self.tree_spf_trace.delete(item)
+        for trace_item in from_auth.get('trace', []):
+            self.tree_spf_trace.insert("", tk.END, values=(
+                trace_item.get('domain'), trace_item.get('mechanism'),
+                trace_item.get('result'), trace_item.get('reason')
+            ))
 
     def _vt_lookup_thread(self, h):
         res = self.ti.lookup_hash_vt(h)

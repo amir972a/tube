@@ -7,6 +7,7 @@ from .urls import URLAnalyzer
 from .attachments import AttachmentAnalyzer
 from .body import BodyAnalyzer
 from .scoring import ScoreEngine
+from .spf_investigator import SpfInvestigator
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ class EmailParser:
         self.attachment_analyzer = AttachmentAnalyzer()
         self.body_analyzer = BodyAnalyzer()
         self.score_engine = ScoreEngine()
+        self.spf_investigator = SpfInvestigator()
 
     def parse_file(self, filepath):
         """Parses an .eml file."""
@@ -116,7 +118,11 @@ class EmailParser:
         results['attachments'] = attachment_results.get('attachments', [])
         results['findings'].extend(attachment_results.get('findings', []))
 
-        # 5. Calculate Score
+        # 5. SPF / DMARC Investigation
+        spf_report = self.spf_investigator.investigate(msg, results['headers'], results['auth'])
+        results['spf_investigation'] = spf_report
+
+        # 6. Calculate Score
         score, severity, scoring_explanations = self.score_engine.calculate(results['findings'])
         results['score'] = score
         results['severity'] = severity
